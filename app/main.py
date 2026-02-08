@@ -4,9 +4,14 @@ from sqlalchemy import text
 
 from app.core.config import settings
 from app.db.session import SessionLocal
+from app.db.base import Base
+from app.db.session import engine
+import app.db.models
+from app.routers import router_recruiter
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title=settings.app_name)
-
+app.include_router(router_recruiter.router)
 
 def get_db():
     db = SessionLocal()
