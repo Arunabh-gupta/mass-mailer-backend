@@ -1,8 +1,6 @@
 from datetime import datetime
 import uuid
-
 from sqlalchemy import DateTime, String
-
 from app.db.base import Base
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -37,6 +35,6 @@ class Recruiter(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
+        default=datetime.now,
         nullable=False
     )

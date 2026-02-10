@@ -9,7 +9,7 @@ class RecruiterResponseDto(BaseModel):
     company: str
     role: str | None
     created_at: datetime
-
+    update_at: datetime
     class Config: 
         # this tell pydantic that I'll be converting SQLAlchemy object into this DTO
         from_attributes: True

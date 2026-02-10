@@ -22,7 +22,7 @@ def get_db():
 @router.post(
     "",
     response_model=RecruiterResponseDto,
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_200_OK,
 )
 def create_recruiter(
     payload: RecruiterRequestDto,
@@ -34,6 +34,7 @@ def create_recruiter(
 @router.get(
     "",
     response_model=list[RecruiterResponseDto],
+    status_code=status.HTTP_200_OK,
 )
 def list_recruiters(
     db: Session = Depends(get_db),
