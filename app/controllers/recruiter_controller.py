@@ -6,12 +6,12 @@ from app.db.models.recruiter import Recruiter
 
 class RecruiterController:
     @staticmethod
-    def create(
+    def create_recruiter(
         db: Session,
         payload: RecruiterRequestDto,
     ) -> Recruiter:
         return RecruiterService.create_recruiter(db, payload)
 
     @staticmethod
-    def list(db: Session) -> list[Recruiter]:
+    def list_recruiters(db: Session) -> list[Recruiter]:
         return RecruiterService.list_recruiters(db)

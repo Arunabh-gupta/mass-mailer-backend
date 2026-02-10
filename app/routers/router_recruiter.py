@@ -28,7 +28,7 @@ def create_recruiter(
     payload: RecruiterRequestDto,
     db: Session = Depends(get_db),
 ):
-    return RecruiterController.create(db, payload)
+    return RecruiterController.create_recruiter(db, payload)
 
 
 @router.get(
@@ -39,4 +39,4 @@ def create_recruiter(
 def list_recruiters(
     db: Session = Depends(get_db),
 ):
-    return RecruiterController.list(db)
+    return RecruiterController.list_recruiters(db)
