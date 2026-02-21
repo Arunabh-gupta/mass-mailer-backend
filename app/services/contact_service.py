@@ -22,6 +22,7 @@ class ContactService:
             name=payload.name,
             email=payload.email,
             company=payload.company,
+            role=payload.role,
         )
         db.add(contact)
         db.commit()

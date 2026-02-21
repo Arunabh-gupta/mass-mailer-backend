@@ -5,5 +5,6 @@ CREATE TABLE contacts (
     name        VARCHAR(255) NOT NULL,
     email       VARCHAR(255) NOT NULL UNIQUE,
     company     VARCHAR(255) NOT NULL,
+    role        VARCHAR(255),
     created_at  TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc')
 );

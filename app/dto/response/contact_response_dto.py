@@ -8,6 +8,7 @@ class ContactResponseDto(BaseModel):
     name: str
     email: EmailStr
     company: str
+    role: str | None
     created_at: datetime
 
     model_config = {"from_attributes": True}
