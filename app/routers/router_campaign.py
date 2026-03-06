@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.controllers.campaign_controller import CampaignController
-from app.db.session import SessionLocal
+from app.db.dependencies import get_db
 from app.dto.request.campaign_request_dto import CampaignRequestDto
 from app.dto.response.campaign_contact_response_dto import CampaignContactResponseDto
 from app.dto.response.campaign_response_dto import CampaignResponseDto
@@ -14,15 +14,6 @@ router = APIRouter(
     prefix="/campaigns",
     tags=["Campaigns"],
 )
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
 
 @router.post(
     "",
@@ -82,4 +73,3 @@ def update_campaign(
     db: Session = Depends(get_db),
 ):
     return CampaignController.update_campaign(db, campaign_id, payload)
-

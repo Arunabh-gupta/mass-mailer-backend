@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.controllers.contact_controller import ContactController
-from app.db.session import SessionLocal
+from app.db.dependencies import get_db
 from app.dto.request.contact_request_dto import ContactRequestDto
 from app.dto.response.contact_response_dto import ContactResponseDto
 
@@ -10,15 +10,6 @@ router = APIRouter(
     prefix="/contacts",
     tags=["Contacts"],
 )
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
 
 @router.post(
     "",
