@@ -1,3 +1,5 @@
+import logging
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -9,6 +11,10 @@ from app.db.models.campaign_contact import CampaignContact
 from app.db.models.contact import Contact
 from app.db.models.email_template import EmailTemplate
 from app.dto.request.campaign_request_dto import CampaignRequestDto
+from app.dto.response.campaign_send_response_dto import CampaignSendResponseDto
+from app.services.email_sender_service import MockEmailSenderService
+
+logger = logging.getLogger(__name__)
 
 
 class CampaignService:
@@ -211,3 +217,68 @@ class CampaignService:
         db.refresh(campaign)
         return campaign
 
+    @staticmethod
+    def send_campaign(db: Session, campaign_id: UUID) -> CampaignSendResponseDto:
+        campaign = CampaignService.get_campaign(db, campaign_id)
+        if campaign.status != CampaignStatus.DRAFT.value:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Campaign can only be sent while in draft status",
+            )
+
+        template = (
+            db.query(EmailTemplate)
+            .filter(EmailTemplate.id == campaign.template_id)
+            .first()
+        )
+        if not template:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Email template not found",
+            )
+
+        campaign_contacts = (
+            db.query(CampaignContact, Contact)
+            .join(Contact, Contact.id == CampaignContact.contact_id)
+            .filter(CampaignContact.campaign_id == campaign_id)
+            .all()
+        )
+        if not campaign_contacts:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Campaign has no recipients",
+            )
+
+        campaign.status = CampaignStatus.SENDING.value
+        sent_count = 0
+
+        for campaign_contact, contact in campaign_contacts:
+            MockEmailSenderService.send_email(
+                campaign_id=campaign.id,
+                contact_id=contact.id,
+                to_email=contact.email,
+                subject=template.subject,
+                body=template.body,
+                template_name=template.name,
+                contact_name=contact.name,
+            )
+            campaign_contact.status = CampaignContactStatus.SENT.value
+            campaign_contact.sent_at = datetime.now()
+            campaign_contact.error_message = None
+            sent_count += 1
+
+        campaign.status = CampaignStatus.COMPLETED.value
+        db.commit()
+        db.refresh(campaign)
+        logger.info(
+            "Mock send completed for campaign_id=%s recipients=%s",
+            campaign_id,
+            sent_count,
+        )
+        return CampaignSendResponseDto(
+            campaign_id=campaign.id,
+            status=CampaignStatus(campaign.status),
+            total_recipients=len(campaign_contacts),
+            sent_recipients=sent_count,
+            mode="mock",
+        )

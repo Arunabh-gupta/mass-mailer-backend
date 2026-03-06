@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.db.models.campaign import Campaign
 from app.db.models.campaign_contact import CampaignContact
 from app.dto.request.campaign_request_dto import CampaignRequestDto
+from app.dto.response.campaign_send_response_dto import CampaignSendResponseDto
 from app.services.campaign_service import CampaignService
 
 
@@ -33,3 +34,6 @@ class CampaignController:
     ) -> Campaign:
         return CampaignService.update_campaign(db, campaign_id, payload)
 
+    @staticmethod
+    def send_campaign(db: Session, campaign_id: UUID) -> CampaignSendResponseDto:
+        return CampaignService.send_campaign(db, campaign_id)

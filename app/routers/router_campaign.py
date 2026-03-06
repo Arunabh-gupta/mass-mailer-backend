@@ -8,6 +8,7 @@ from app.db.dependencies import get_db
 from app.dto.request.campaign_request_dto import CampaignRequestDto
 from app.dto.response.campaign_contact_response_dto import CampaignContactResponseDto
 from app.dto.response.campaign_response_dto import CampaignResponseDto
+from app.dto.response.campaign_send_response_dto import CampaignSendResponseDto
 
 
 router = APIRouter(
@@ -73,3 +74,15 @@ def update_campaign(
     db: Session = Depends(get_db),
 ):
     return CampaignController.update_campaign(db, campaign_id, payload)
+
+
+@router.post(
+    "/{campaign_id}/send",
+    response_model=CampaignSendResponseDto,
+    status_code=status.HTTP_200_OK,
+)
+def send_campaign(
+    campaign_id: UUID,
+    db: Session = Depends(get_db),
+):
+    return CampaignController.send_campaign(db, campaign_id)
