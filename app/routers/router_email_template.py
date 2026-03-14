@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
@@ -33,3 +35,39 @@ def list_email_templates(
     db: Session = Depends(get_db),
 ):
     return EmailTemplateController.list_email_templates(db)
+
+
+@router.get(
+    "/{template_id}",
+    response_model=EmailTemplateResponseDto,
+    status_code=status.HTTP_200_OK,
+)
+def get_email_template(
+    template_id: UUID,
+    db: Session = Depends(get_db),
+):
+    return EmailTemplateController.get_email_template(db, template_id)
+
+
+@router.put(
+    "/{template_id}",
+    response_model=EmailTemplateResponseDto,
+    status_code=status.HTTP_200_OK,
+)
+def update_email_template(
+    template_id: UUID,
+    payload: EmailTemplateRequestDto,
+    db: Session = Depends(get_db),
+):
+    return EmailTemplateController.update_email_template(db, template_id, payload)
+
+
+@router.delete(
+    "/{template_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_email_template(
+    template_id: UUID,
+    db: Session = Depends(get_db),
+):
+    EmailTemplateController.delete_email_template(db, template_id)
