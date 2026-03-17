@@ -63,7 +63,7 @@ def list_campaign_contacts(
     return CampaignController.list_campaign_contacts(db, campaign_id)
 
 
-@router.patch(
+@router.put(
     "/{campaign_id}",
     response_model=CampaignResponseDto,
     status_code=status.HTTP_200_OK,
@@ -74,6 +74,17 @@ def update_campaign(
     db: Session = Depends(get_db),
 ):
     return CampaignController.update_campaign(db, campaign_id, payload)
+
+
+@router.delete(
+    "/{campaign_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_campaign(
+    campaign_id: UUID,
+    db: Session = Depends(get_db),
+):
+    CampaignController.delete_campaign(db, campaign_id)
 
 
 @router.post(

@@ -35,5 +35,9 @@ class CampaignController:
         return CampaignService.update_campaign(db, campaign_id, payload)
 
     @staticmethod
+    def delete_campaign(db: Session, campaign_id: UUID) -> None:
+        CampaignService.delete_campaign(db, campaign_id)
+
+    @staticmethod
     def send_campaign(db: Session, campaign_id: UUID) -> CampaignSendResponseDto:
         return CampaignService.send_campaign(db, campaign_id)

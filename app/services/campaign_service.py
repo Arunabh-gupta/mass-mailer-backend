@@ -218,6 +218,23 @@ class CampaignService:
         return campaign
 
     @staticmethod
+    def delete_campaign(db: Session, campaign_id: UUID) -> None:
+        campaign = CampaignService.get_campaign(db, campaign_id)
+        if campaign.status == CampaignStatus.SENDING.value:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Campaign cannot be deleted while it is sending",
+            )
+
+        (
+            db.query(CampaignContact)
+            .filter(CampaignContact.campaign_id == campaign_id)
+            .delete(synchronize_session=False)
+        )
+        db.delete(campaign)
+        db.commit()
+
+    @staticmethod
     def send_campaign(db: Session, campaign_id: UUID) -> CampaignSendResponseDto:
         campaign = CampaignService.get_campaign(db, campaign_id)
         if campaign.status != CampaignStatus.DRAFT.value:

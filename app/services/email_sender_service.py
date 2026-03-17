@@ -1,4 +1,5 @@
 import logging
+import time
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,7 @@ class MockEmailSenderService:
         template_name: str,
         contact_name: str,
     ) -> None:
+        # Temporary hardcoded delay to test the send button loading state.
         logger.info(
             (
                 "Mock send email | campaign_id=%s contact_id=%s to=%s "
