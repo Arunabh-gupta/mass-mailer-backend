@@ -19,10 +19,13 @@ logger = logging.getLogger(__name__)
 
 class CampaignService:
     @staticmethod
-    def get_campaign(db: Session, campaign_id: UUID) -> Campaign:
+    def get_campaign(db: Session, user_id: UUID, campaign_id: UUID) -> Campaign:
         campaign = (
             db.query(Campaign)
-            .filter(Campaign.id == campaign_id)
+            .filter(
+                Campaign.id == campaign_id,
+                Campaign.user_id == user_id,
+            )
             .first()
         )
         if not campaign:
@@ -33,10 +36,13 @@ class CampaignService:
         return campaign
 
     @staticmethod
-    def create_campaign(db: Session, payload: CampaignRequestDto) -> Campaign:
+    def create_campaign(db: Session, user_id: UUID, payload: CampaignRequestDto) -> Campaign:
         template = (
             db.query(EmailTemplate)
-            .filter(EmailTemplate.id == payload.template_id)
+            .filter(
+                EmailTemplate.id == payload.template_id,
+                EmailTemplate.user_id == user_id,
+            )
             .first()
         )
         if not template:
@@ -51,7 +57,6 @@ class CampaignService:
                 detail="contact_ids must contain at least one contact id",
             )
 
-        # Guard against duplicates in request body.
         unique_contact_ids: list[UUID] = list(dict.fromkeys(payload.contact_ids))
         if len(unique_contact_ids) != len(payload.contact_ids):
             raise HTTPException(
@@ -61,7 +66,10 @@ class CampaignService:
 
         contacts = (
             db.query(Contact)
-            .filter(Contact.id.in_(unique_contact_ids))
+            .filter(
+                Contact.user_id == user_id,
+                Contact.id.in_(unique_contact_ids),
+            )
             .all()
         )
 
@@ -74,9 +82,9 @@ class CampaignService:
             )
 
         campaign = Campaign(
+            user_id=user_id,
             template_id=payload.template_id,
             status=CampaignStatus.DRAFT.value,
-            user_id=None,
         )
         db.add(campaign)
         db.commit()
@@ -96,13 +104,20 @@ class CampaignService:
         return campaign
 
     @staticmethod
-    def list_campaigns(db: Session) -> list[Campaign]:
-        return db.query(Campaign).all()
+    def list_campaigns(db: Session, user_id: UUID) -> list[Campaign]:
+        return (
+            db.query(Campaign)
+            .filter(Campaign.user_id == user_id)
+            .all()
+        )
 
     @staticmethod
-    def list_campaign_contacts(db: Session, campaign_id: UUID) -> list[CampaignContact]:
-        # Ensure campaign exists for a clean 404 vs returning empty list.
-        CampaignService.get_campaign(db, campaign_id)
+    def list_campaign_contacts(
+        db: Session,
+        user_id: UUID,
+        campaign_id: UUID,
+    ) -> list[CampaignContact]:
+        CampaignService.get_campaign(db, user_id, campaign_id)
         return (
             db.query(CampaignContact)
             .filter(CampaignContact.campaign_id == campaign_id)
@@ -112,19 +127,18 @@ class CampaignService:
     @staticmethod
     def update_campaign(
         db: Session,
+        user_id: UUID,
         campaign_id: UUID,
         payload: CampaignRequestDto,
     ) -> Campaign:
-        campaign = CampaignService.get_campaign(db, campaign_id)
+        campaign = CampaignService.get_campaign(db, user_id, campaign_id)
 
-        # Allow updates only before sending starts.
         if campaign.status != CampaignStatus.DRAFT.value:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Campaign can only be updated while in draft status",
             )
 
-        # Ensure nothing has been sent yet.
         any_non_pending = (
             db.query(CampaignContact)
             .filter(
@@ -142,7 +156,10 @@ class CampaignService:
         if payload.template_id is not None:
             template = (
                 db.query(EmailTemplate)
-                .filter(EmailTemplate.id == payload.template_id)
+                .filter(
+                    EmailTemplate.id == payload.template_id,
+                    EmailTemplate.user_id == user_id,
+                )
                 .first()
             )
             if not template:
@@ -168,7 +185,10 @@ class CampaignService:
 
             contacts = (
                 db.query(Contact)
-                .filter(Contact.id.in_(unique_contact_ids))
+                .filter(
+                    Contact.user_id == user_id,
+                    Contact.id.in_(unique_contact_ids),
+                )
                 .all()
             )
 
@@ -218,8 +238,8 @@ class CampaignService:
         return campaign
 
     @staticmethod
-    def delete_campaign(db: Session, campaign_id: UUID) -> None:
-        campaign = CampaignService.get_campaign(db, campaign_id)
+    def delete_campaign(db: Session, user_id: UUID, campaign_id: UUID) -> None:
+        campaign = CampaignService.get_campaign(db, user_id, campaign_id)
         if campaign.status == CampaignStatus.SENDING.value:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -235,8 +255,12 @@ class CampaignService:
         db.commit()
 
     @staticmethod
-    def send_campaign(db: Session, campaign_id: UUID) -> CampaignSendResponseDto:
-        campaign = CampaignService.get_campaign(db, campaign_id)
+    def send_campaign(
+        db: Session,
+        user_id: UUID,
+        campaign_id: UUID,
+    ) -> CampaignSendResponseDto:
+        campaign = CampaignService.get_campaign(db, user_id, campaign_id)
         if campaign.status != CampaignStatus.DRAFT.value:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -245,7 +269,10 @@ class CampaignService:
 
         template = (
             db.query(EmailTemplate)
-            .filter(EmailTemplate.id == campaign.template_id)
+            .filter(
+                EmailTemplate.id == campaign.template_id,
+                EmailTemplate.user_id == user_id,
+            )
             .first()
         )
         if not template:
@@ -257,7 +284,10 @@ class CampaignService:
         campaign_contacts = (
             db.query(CampaignContact, Contact)
             .join(Contact, Contact.id == CampaignContact.contact_id)
-            .filter(CampaignContact.campaign_id == campaign_id)
+            .filter(
+                CampaignContact.campaign_id == campaign_id,
+                Contact.user_id == user_id,
+            )
             .all()
         )
         if not campaign_contacts:
@@ -288,9 +318,10 @@ class CampaignService:
         db.commit()
         db.refresh(campaign)
         logger.info(
-            "Mock send completed for campaign_id=%s recipients=%s",
+            "Mock send completed for campaign_id=%s recipients=%s user_id=%s",
             campaign_id,
             sent_count,
+            user_id,
         )
         return CampaignSendResponseDto(
             campaign_id=campaign.id,

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -37,3 +38,9 @@ def get_current_user(
     identity = verify_token(credentials.credentials)
     user = AuthService.get_or_create_user_from_identity(db, identity)
     return AuthenticatedUser(user=user, identity=identity)
+
+
+def get_current_user_id(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+) -> UUID:
+    return current_user.user.id

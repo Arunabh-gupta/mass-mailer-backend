@@ -11,32 +11,36 @@ class ContactController:
     @staticmethod
     def get_contact(
         db: Session,
+        user_id: UUID,
         contact_id: UUID,
     ) -> Contact:
-        return ContactService.get_contact(db, contact_id)
+        return ContactService.get_contact(db, user_id, contact_id)
 
     @staticmethod
     def create_contact(
         db: Session,
+        user_id: UUID,
         payload: ContactRequestDto,
     ) -> Contact:
-        return ContactService.create_contact(db, payload)
+        return ContactService.create_contact(db, user_id, payload)
 
     @staticmethod
-    def list_contacts(db: Session) -> list[Contact]:
-        return ContactService.list_contacts(db)
+    def list_contacts(db: Session, user_id: UUID) -> list[Contact]:
+        return ContactService.list_contacts(db, user_id)
 
     @staticmethod
     def update_contact(
         db: Session,
+        user_id: UUID,
         contact_id: UUID,
         payload: ContactRequestDto,
     ) -> Contact:
-        return ContactService.update_contact(db, contact_id, payload)
+        return ContactService.update_contact(db, user_id, contact_id, payload)
 
     @staticmethod
     def delete_contact(
         db: Session,
+        user_id: UUID,
         contact_id: UUID,
     ) -> None:
-        ContactService.delete_contact(db, contact_id)
+        ContactService.delete_contact(db, user_id, contact_id)

@@ -1,19 +1,14 @@
 import logging
 import time
 
-from fastapi import FastAPI, Depends, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.base import Base
-from app.db.session import engine
 from app.db.dependencies import get_db
-import app.db.models
 from app.routers import router_auth, router_campaign, router_contact, router_email_template
-
-Base.metadata.create_all(bind=engine)
 
 logging.basicConfig(
     level=logging.DEBUG if settings.debug else logging.INFO,

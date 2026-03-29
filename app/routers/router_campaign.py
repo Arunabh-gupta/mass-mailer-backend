@@ -1,8 +1,9 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 
+from app.auth.dependencies import get_current_user, get_current_user_id
 from app.controllers.campaign_controller import CampaignController
 from app.db.dependencies import get_db
 from app.dto.request.campaign_request_dto import CampaignRequestDto
@@ -14,7 +15,9 @@ from app.dto.response.campaign_send_response_dto import CampaignSendResponseDto
 router = APIRouter(
     prefix="/campaigns",
     tags=["Campaigns"],
+    dependencies=[Depends(get_current_user)],
 )
+
 
 @router.post(
     "",
@@ -24,8 +27,9 @@ router = APIRouter(
 def create_campaign(
     payload: CampaignRequestDto,
     db: Session = Depends(get_db),
+    user_id: UUID = Depends(get_current_user_id),
 ):
-    return CampaignController.create_campaign(db, payload)
+    return CampaignController.create_campaign(db, user_id, payload)
 
 
 @router.get(
@@ -35,8 +39,9 @@ def create_campaign(
 )
 def list_campaigns(
     db: Session = Depends(get_db),
+    user_id: UUID = Depends(get_current_user_id),
 ):
-    return CampaignController.list_campaigns(db)
+    return CampaignController.list_campaigns(db, user_id)
 
 
 @router.get(
@@ -47,8 +52,9 @@ def list_campaigns(
 def get_campaign(
     campaign_id: UUID,
     db: Session = Depends(get_db),
+    user_id: UUID = Depends(get_current_user_id),
 ):
-    return CampaignController.get_campaign(db, campaign_id)
+    return CampaignController.get_campaign(db, user_id, campaign_id)
 
 
 @router.get(
@@ -59,8 +65,9 @@ def get_campaign(
 def list_campaign_contacts(
     campaign_id: UUID,
     db: Session = Depends(get_db),
+    user_id: UUID = Depends(get_current_user_id),
 ):
-    return CampaignController.list_campaign_contacts(db, campaign_id)
+    return CampaignController.list_campaign_contacts(db, user_id, campaign_id)
 
 
 @router.put(
@@ -72,19 +79,23 @@ def update_campaign(
     campaign_id: UUID,
     payload: CampaignRequestDto,
     db: Session = Depends(get_db),
+    user_id: UUID = Depends(get_current_user_id),
 ):
-    return CampaignController.update_campaign(db, campaign_id, payload)
+    return CampaignController.update_campaign(db, user_id, campaign_id, payload)
 
 
 @router.delete(
     "/{campaign_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
 )
 def delete_campaign(
     campaign_id: UUID,
     db: Session = Depends(get_db),
+    user_id: UUID = Depends(get_current_user_id),
 ):
-    CampaignController.delete_campaign(db, campaign_id)
+    CampaignController.delete_campaign(db, user_id, campaign_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(
@@ -95,5 +106,6 @@ def delete_campaign(
 def send_campaign(
     campaign_id: UUID,
     db: Session = Depends(get_db),
+    user_id: UUID = Depends(get_current_user_id),
 ):
-    return CampaignController.send_campaign(db, campaign_id)
+    return CampaignController.send_campaign(db, user_id, campaign_id)

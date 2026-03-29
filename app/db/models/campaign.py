@@ -1,7 +1,7 @@
 from datetime import datetime
 import uuid
 
-from sqlalchemy import DateTime, String, ForeignKey
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -15,12 +15,12 @@ class Campaign(Base):
         default=uuid.uuid4,
     )
 
-    # Will point to the local User table when added.
-    user_id: Mapped[uuid.UUID | None] = mapped_column(
-        nullable=True,
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=False,
+        index=True,
     )
 
-    # References EmailTemplate.id
     template_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("email_template.id"),
         nullable=False,
@@ -36,4 +36,3 @@ class Campaign(Base):
         default=datetime.now,
         nullable=False,
     )
-
