@@ -23,19 +23,17 @@ This backend is built with FastAPI and exposes APIs for contacts, email template
 Create a `.env` file in the backend root.
 
 ```env
-ENV=local
-APP_NAME=Mass Mailer Backend
-DEBUG=true
-DATABASE_URL=postgresql+psycopg2://resume_user:resume_pass@localhost:5432/mass_mailer
-CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+ENV=<environment>
+APP_NAME=<backend_app_name>
+DEBUG=<true_or_false>
+DATABASE_URL=<postgresql_connection_url>
+CORS_ALLOWED_ORIGINS=<comma_separated_frontend_origins>
 
-AUTH_PROVIDER_NAME=clerk
-AUTH_JWT_KEY="-----BEGIN PUBLIC KEY-----
-...
------END PUBLIC KEY-----"
-AUTH_JWT_ALGORITHM=RS256
-AUTH_JWT_ISSUER=https://your-clerk-instance.clerk.accounts.dev
-AUTH_AUTHORIZED_PARTIES=http://localhost:5173
+AUTH_PROVIDER_NAME=<auth_provider_name>
+AUTH_JWT_KEY=<public_jwt_verification_key>
+AUTH_JWT_ALGORITHM=<jwt_algorithm>
+AUTH_JWT_ISSUER=<jwt_issuer_url>
+AUTH_AUTHORIZED_PARTIES=<comma_separated_authorized_parties>
 ```
 
 Notes:
