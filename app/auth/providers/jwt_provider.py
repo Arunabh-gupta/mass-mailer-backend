@@ -1,9 +1,12 @@
+import logging
+
 import jwt
 from fastapi import HTTPException, status
 from jwt import ExpiredSignatureError, InvalidTokenError
 
 from app.auth.types import AuthIdentity
 from app.core.config import settings
+logger = logging.getLogger(__name__)
 
 
 def _unauthorized(detail: str) -> HTTPException:
@@ -29,6 +32,7 @@ def verify_token(token: str) -> AuthIdentity:
         decode_kwargs["issuer"] = settings.auth_jwt_issuer
 
     try:
+        settings.auth_jwt_key = settings.auth_jwt_key.replace("\\n", "\n")   
         claims = jwt.decode(token, settings.auth_jwt_key, **decode_kwargs)
     except ExpiredSignatureError as exc:
         raise _unauthorized("Authentication token has expired") from exc
