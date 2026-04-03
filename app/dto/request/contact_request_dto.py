@@ -5,4 +5,4 @@ class ContactRequestDto(BaseModel):
     name: str
     email: EmailStr
     company: str
-    role: str | None = None
+    job_title: str | None = None

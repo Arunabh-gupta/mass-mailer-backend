@@ -46,7 +46,7 @@ class ContactService:
             name=payload.name,
             email=payload.email,
             company=payload.company,
-            role=payload.role,
+            job_title=payload.job_title,
         )
         db.add(contact)
         db.commit()
@@ -88,7 +88,7 @@ class ContactService:
         contact.name = payload.name
         contact.email = payload.email
         contact.company = payload.company
-        contact.role = payload.role
+        contact.job_title = payload.job_title
 
         db.commit()
         db.refresh(contact)

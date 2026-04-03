@@ -39,7 +39,7 @@ class Contact(Base):
         nullable=False,
     )
 
-    role: Mapped[str | None] = mapped_column(
+    job_title: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
     )
