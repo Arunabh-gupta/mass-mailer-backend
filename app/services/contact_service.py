@@ -1,15 +1,18 @@
 import csv
+import math
 from io import StringIO
 from uuid import UUID
 
 from fastapi import HTTPException, UploadFile, status
 from pydantic import EmailStr, TypeAdapter, ValidationError
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.db.models.campaign_contact import CampaignContact
 from app.db.models.contact import Contact
 from app.dto.request.contact_request_dto import ContactRequestDto
 from app.dto.response.contact_import_response_dto import ContactImportErrorDto, ContactImportResponseDto
+from app.dto.response.contact_list_response_dto import ContactListResponseDto
 
 email_adapter = TypeAdapter(EmailStr)
 
@@ -192,11 +195,54 @@ class ContactService:
         )
 
     @staticmethod
-    def list_contacts(db: Session, user_id: UUID) -> list[Contact]:
-        return (
-            db.query(Contact)
-            .filter(Contact.user_id == user_id)
+    def list_contacts(
+        db: Session,
+        user_id: UUID,
+        page: int = 1,
+        page_size: int = 10,
+        query: str | None = None,
+        include_totals: bool = False,
+    ) -> ContactListResponseDto:
+        query = query.strip() if query else None
+
+        contacts_query = db.query(Contact).filter(Contact.user_id == user_id)
+
+        if query:
+            search_pattern = f'%{query}%'
+            contacts_query = contacts_query.filter(
+                or_(
+                    Contact.name.ilike(search_pattern),
+                    Contact.email.ilike(search_pattern),
+                    Contact.company.ilike(search_pattern),
+                    Contact.job_title.ilike(search_pattern),
+                )
+            )
+
+        paged_items = (
+            contacts_query
+            .order_by(Contact.name.asc(), Contact.email.asc())
+            .offset((page - 1) * page_size)
+            .limit(page_size + 1)
             .all()
+        )
+        has_next = len(paged_items) > page_size
+        items = paged_items[:page_size]
+        has_previous = page > 1
+
+        total = None
+        total_pages = None
+        if include_totals:
+            total = contacts_query.count()
+            total_pages = max(1, math.ceil(total / page_size)) if page_size else 1
+
+        return ContactListResponseDto(
+            items=items,
+            page=page,
+            page_size=page_size,
+            has_previous=has_previous,
+            has_next=has_next,
+            total=total,
+            total_pages=total_pages,
         )
 
     @staticmethod

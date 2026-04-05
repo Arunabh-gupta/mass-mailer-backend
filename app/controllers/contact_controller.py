@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.db.models.contact import Contact
 from app.dto.request.contact_request_dto import ContactRequestDto
 from app.dto.response.contact_import_response_dto import ContactImportResponseDto
+from app.dto.response.contact_list_response_dto import ContactListResponseDto
 from app.services.contact_service import ContactService
 
 
@@ -35,8 +36,22 @@ class ContactController:
         return ContactService.import_contacts(db, user_id, file)
 
     @staticmethod
-    def list_contacts(db: Session, user_id: UUID) -> list[Contact]:
-        return ContactService.list_contacts(db, user_id)
+    def list_contacts(
+        db: Session,
+        user_id: UUID,
+        page: int,
+        page_size: int,
+        query: str | None,
+        include_totals: bool,
+    ) -> ContactListResponseDto:
+        return ContactService.list_contacts(
+            db,
+            user_id,
+            page=page,
+            page_size=page_size,
+            query=query,
+            include_totals=include_totals,
+        )
 
     @staticmethod
     def update_contact(
