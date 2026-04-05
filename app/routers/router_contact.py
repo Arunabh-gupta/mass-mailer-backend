@@ -1,12 +1,13 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, File, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user, get_current_user_id
 from app.controllers.contact_controller import ContactController
 from app.db.dependencies import get_db
 from app.dto.request.contact_request_dto import ContactRequestDto
+from app.dto.response.contact_import_response_dto import ContactImportResponseDto
 from app.dto.response.contact_response_dto import ContactResponseDto
 
 router = APIRouter(
@@ -14,6 +15,7 @@ router = APIRouter(
     tags=["Contacts"],
     dependencies=[Depends(get_current_user)],
 )
+
 
 @router.post(
     "",
@@ -26,6 +28,19 @@ def create_contact(
     user_id: UUID = Depends(get_current_user_id),
 ):
     return ContactController.create_contact(db, user_id, payload)
+
+
+@router.post(
+    "/import",
+    response_model=ContactImportResponseDto,
+    status_code=status.HTTP_200_OK,
+)
+def import_contacts(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user_id: UUID = Depends(get_current_user_id),
+):
+    return ContactController.import_contacts(db, user_id, file)
 
 
 @router.get(
