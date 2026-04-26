@@ -7,13 +7,11 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.logging import setup_logging
 from app.db.dependencies import get_db
 from app.routers import router_auth, router_campaign, router_contact, router_email_template
 
-logging.basicConfig(
-    level=logging.DEBUG if settings.debug else logging.INFO,
-    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-)
+setup_logging("api")
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title=settings.app_name)

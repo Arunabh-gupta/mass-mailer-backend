@@ -1,6 +1,5 @@
 import json
 import logging
-import time
 from datetime import datetime
 from uuid import UUID
 
@@ -9,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.constants import CampaignContactStatus, CampaignStatus
+from app.core.logging import setup_logging
 from app.db.models.campaign import Campaign
 from app.db.models.campaign_contact import CampaignContact
 from app.db.models.contact import Contact
@@ -40,6 +40,12 @@ def _process_campaign_contact_send(db: Session, payload: dict[str, str]) -> None
     campaign_contact_id = UUID(payload["campaign_contact_id"])
     campaign_id = UUID(payload["campaign_id"])
     user_id = UUID(payload["user_id"])
+    logger.info(
+        "Processing send job | campaign_id=%s campaign_contact_id=%s user_id=%s",
+        campaign_id,
+        campaign_contact_id,
+        user_id,
+    )
 
     campaign_contact = (
         db.query(CampaignContact)
@@ -84,7 +90,14 @@ def _process_campaign_contact_send(db: Session, payload: dict[str, str]) -> None
             EmailTemplate.id == campaign.template_id,
             EmailTemplate.user_id == user_id,
         )
-        .first()
+            .first()
+    )
+
+    logger.info(
+        "Loaded campaign send resources | campaign_id=%s contact_found=%s template_found=%s",
+        campaign_id,
+        bool(contact),
+        bool(template),
     )
 
     if not contact or not template:
@@ -92,9 +105,21 @@ def _process_campaign_contact_send(db: Session, payload: dict[str, str]) -> None
         campaign_contact.error_message = "Contact or template not found"
         campaign.status = _compute_campaign_status(db, campaign_id)
         db.commit()
+        logger.warning(
+            "Marked campaign contact as failed due to missing resource | "
+            "campaign_contact_id=%s campaign_status=%s",
+            campaign_contact.id,
+            campaign.status,
+        )
         return
 
     try:
+        logger.info(
+            "Sending email for contact | campaign_id=%s campaign_contact_id=%s to_email=%s",
+            campaign.id,
+            campaign_contact.id,
+            contact.email,
+        )
         MockEmailSenderService.send_email(
             campaign_id=campaign.id,
             contact_id=contact.id,
@@ -107,19 +132,36 @@ def _process_campaign_contact_send(db: Session, payload: dict[str, str]) -> None
         campaign_contact.status = CampaignContactStatus.SENT.value
         campaign_contact.sent_at = datetime.now()
         campaign_contact.error_message = None
+        logger.info(
+            "Email send completed | campaign_id=%s campaign_contact_id=%s to_email=%s",
+            campaign.id,
+            campaign_contact.id,
+            contact.email,
+        )
     except Exception as exc:
         campaign_contact.status = CampaignContactStatus.FAILED.value
         campaign_contact.error_message = str(exc)
+        logger.exception(
+            "Email send failed | campaign_id=%s campaign_contact_id=%s to_email=%s",
+            campaign.id,
+            campaign_contact.id,
+            contact.email,
+        )
 
     campaign.status = _compute_campaign_status(db, campaign_id)
     db.commit()
+    logger.info(
+        "Updated database after job | campaign_id=%s campaign_contact_id=%s "
+        "contact_status=%s campaign_status=%s",
+        campaign.id,
+        campaign_contact.id,
+        campaign_contact.status,
+        campaign.status,
+    )
 
 
 def run_worker() -> None:
-    logging.basicConfig(
-        level=logging.DEBUG if settings.debug else logging.INFO,
-        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-    )
+    setup_logging("worker")
 
     if not settings.aws_sqs_campaign_send_queue_url:
         raise RuntimeError("AWS_SQS_CAMPAIGN_SEND_QUEUE_URL is not configured")
@@ -136,8 +178,9 @@ def run_worker() -> None:
             visibility_timeout=30,
         )
         if not messages:
-            time.sleep(1)
             continue
+
+        logger.info("Received %s message(s) from SQS", len(messages))
 
         for message in messages:
             receipt_handle = message["ReceiptHandle"]
@@ -147,6 +190,7 @@ def run_worker() -> None:
                 if payload.get("job_type") != "campaign_contact_send":
                     logger.warning("Skipping unsupported SQS job | payload=%s", payload)
                 else:
+                    logger.info("Received SQS job | payload=%s", payload)
                     db = SessionLocal()
                     try:
                         _process_campaign_contact_send(db, payload)
@@ -157,6 +201,7 @@ def run_worker() -> None:
                     queue_url=queue_url,
                     receipt_handle=receipt_handle,
                 )
+                logger.info("Deleted processed SQS message | payload=%s", payload)
             except Exception:
                 logger.exception("Failed processing SQS message | payload=%s", payload)
 
