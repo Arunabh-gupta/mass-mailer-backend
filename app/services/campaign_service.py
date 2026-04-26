@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -12,7 +11,7 @@ from app.db.models.contact import Contact
 from app.db.models.email_template import EmailTemplate
 from app.dto.request.campaign_request_dto import CampaignRequestDto
 from app.dto.response.campaign_send_response_dto import CampaignSendResponseDto
-from app.services.email_sender_service import MockEmailSenderService
+from app.services.campaign_queue_service import CampaignQueueService
 
 logger = logging.getLogger(__name__)
 
@@ -296,37 +295,38 @@ class CampaignService:
                 detail="Campaign has no recipients",
             )
 
-        campaign.status = CampaignStatus.SENDING.value
-        sent_count = 0
-
-        for campaign_contact, contact in campaign_contacts:
-            MockEmailSenderService.send_email(
-                campaign_id=campaign.id,
-                contact_id=contact.id,
-                to_email=contact.email,
-                subject=template.subject,
-                body=template.body,
-                template_name=template.name,
-                contact_name=contact.name,
+        try:
+            for campaign_contact, _contact in campaign_contacts:
+                CampaignQueueService.enqueue_campaign_contact_send(
+                    campaign_id=campaign.id,
+                    campaign_contact_id=campaign_contact.id,
+                    user_id=user_id,
+                )
+        except Exception:
+            logger.exception(
+                "Failed to enqueue campaign send jobs | campaign_id=%s user_id=%s",
+                campaign_id,
+                user_id,
             )
-            campaign_contact.status = CampaignContactStatus.SENT.value
-            campaign_contact.sent_at = datetime.now()
-            campaign_contact.error_message = None
-            sent_count += 1
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Failed to queue campaign send jobs",
+            )
 
-        campaign.status = CampaignStatus.COMPLETED.value
+        campaign.status = CampaignStatus.SENDING.value
         db.commit()
         db.refresh(campaign)
         logger.info(
-            "Mock send completed for campaign_id=%s recipients=%s user_id=%s",
+            "Queued campaign send | campaign_id=%s recipients=%s user_id=%s",
             campaign_id,
-            sent_count,
+            len(campaign_contacts),
             user_id,
         )
         return CampaignSendResponseDto(
             campaign_id=campaign.id,
             status=CampaignStatus(campaign.status),
             total_recipients=len(campaign_contacts),
-            sent_recipients=sent_count,
-            mode="mock",
+            sent_recipients=0,
+            mode="sqs",
         )
