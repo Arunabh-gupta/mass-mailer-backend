@@ -13,10 +13,13 @@ class Settings(BaseSettings):
     auth_jwt_algorithm: str = "RS256"
     auth_jwt_issuer: str | None = None
     auth_authorized_parties: list[str] = []
+    email_provider: str = "mock"
     aws_region: str = "us-east-1"
     aws_profile: str | None = None
     aws_sqs_endpoint_url: str | None = None
     aws_sqs_campaign_send_queue_url: str | None = None
+    aws_ses_endpoint_url: str | None = None
+    aws_ses_from_email: str | None = None
 
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod
@@ -32,7 +35,14 @@ class Settings(BaseSettings):
             return [party.strip() for party in value.split(",") if party.strip()]
         return value
 
-    @field_validator("aws_profile", "aws_sqs_endpoint_url", "aws_sqs_campaign_send_queue_url", mode="before")
+    @field_validator(
+        "aws_profile",
+        "aws_sqs_endpoint_url",
+        "aws_sqs_campaign_send_queue_url",
+        "aws_ses_endpoint_url",
+        "aws_ses_from_email",
+        mode="before",
+    )
     @classmethod
     def empty_string_to_none(cls, value):
         if isinstance(value, str) and not value.strip():

@@ -14,7 +14,7 @@ from app.db.models.campaign_contact import CampaignContact
 from app.db.models.contact import Contact
 from app.db.models.email_template import EmailTemplate
 from app.db.session import SessionLocal
-from app.services.email_sender_service import MockEmailSenderService
+from app.services.email_sender_service import EmailSenderService
 from app.services.sqs_service import SqsService
 
 logger = logging.getLogger(__name__)
@@ -120,7 +120,7 @@ def _process_campaign_contact_send(db: Session, payload: dict[str, str]) -> None
             campaign_contact.id,
             contact.email,
         )
-        MockEmailSenderService.send_email(
+        EmailSenderService.send_email(
             campaign_id=campaign.id,
             contact_id=contact.id,
             to_email=contact.email,
