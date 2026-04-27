@@ -7,7 +7,7 @@ import app.db.models  # noqa: F401
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.constants import CampaignContactStatus, CampaignStatus
+from app.core.constants import CampaignContactStatus
 from app.core.logging import setup_logging
 from app.db.models.campaign import Campaign
 from app.db.models.campaign_contact import CampaignContact
@@ -18,24 +18,6 @@ from app.services.email_sender_service import EmailSenderService
 from app.services.sqs_service import SqsService
 
 logger = logging.getLogger(__name__)
-
-
-def _compute_campaign_status(db: Session, campaign_id: UUID) -> str:
-    statuses = [
-        status
-        for (status,) in (
-            db.query(CampaignContact.status)
-            .filter(CampaignContact.campaign_id == campaign_id)
-            .all()
-        )
-    ]
-    if not statuses or any(status == CampaignContactStatus.PENDING.value for status in statuses):
-        return CampaignStatus.SENDING.value
-    if any(status == CampaignContactStatus.FAILED.value for status in statuses):
-        return CampaignStatus.FAILED.value
-    return CampaignStatus.COMPLETED.value
-
-
 def _process_campaign_contact_send(db: Session, payload: dict[str, str]) -> None:
     campaign_contact_id = UUID(payload["campaign_contact_id"])
     campaign_id = UUID(payload["campaign_id"])
@@ -102,8 +84,8 @@ def _process_campaign_contact_send(db: Session, payload: dict[str, str]) -> None
 
     if not contact or not template:
         campaign_contact.status = CampaignContactStatus.FAILED.value
+        campaign_contact.processed_at = datetime.now()
         campaign_contact.error_message = "Contact or template not found"
-        campaign.status = _compute_campaign_status(db, campaign_id)
         db.commit()
         logger.warning(
             "Marked campaign contact as failed due to missing resource | "
@@ -120,7 +102,7 @@ def _process_campaign_contact_send(db: Session, payload: dict[str, str]) -> None
             campaign_contact.id,
             contact.email,
         )
-        EmailSenderService.send_email(
+        send_result = EmailSenderService.send_email(
             campaign_id=campaign.id,
             contact_id=contact.id,
             to_email=contact.email,
@@ -130,16 +112,21 @@ def _process_campaign_contact_send(db: Session, payload: dict[str, str]) -> None
             contact_name=contact.name,
         )
         campaign_contact.status = CampaignContactStatus.SENT.value
+        campaign_contact.processed_at = datetime.now()
         campaign_contact.sent_at = datetime.now()
+        campaign_contact.provider_message_id = send_result.get("message_id")
         campaign_contact.error_message = None
         logger.info(
-            "Email send completed | campaign_id=%s campaign_contact_id=%s to_email=%s",
+            "Email send completed | campaign_id=%s campaign_contact_id=%s to_email=%s message_id=%s",
             campaign.id,
             campaign_contact.id,
             contact.email,
+            campaign_contact.provider_message_id,
         )
     except Exception as exc:
         campaign_contact.status = CampaignContactStatus.FAILED.value
+        campaign_contact.processed_at = datetime.now()
+        campaign_contact.provider_message_id = None
         campaign_contact.error_message = str(exc)
         logger.exception(
             "Email send failed | campaign_id=%s campaign_contact_id=%s to_email=%s",
@@ -148,7 +135,6 @@ def _process_campaign_contact_send(db: Session, payload: dict[str, str]) -> None
             contact.email,
         )
 
-    campaign.status = _compute_campaign_status(db, campaign_id)
     db.commit()
     logger.info(
         "Updated database after job | campaign_id=%s campaign_contact_id=%s "

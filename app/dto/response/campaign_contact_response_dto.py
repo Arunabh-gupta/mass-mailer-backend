@@ -11,9 +11,10 @@ class CampaignContactResponseDto(BaseModel):
     campaign_id: UUID
     contact_id: UUID
     status: CampaignContactStatus
+    processed_at: datetime | None
     sent_at: datetime | None
+    provider_message_id: str | None
     error_message: str | None
     created_at: datetime
 
     model_config = {"from_attributes": True}
-

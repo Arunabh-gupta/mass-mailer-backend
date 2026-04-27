@@ -19,8 +19,6 @@ def _build_aws_session() -> boto3.session.Session:
 def _render_template_text(value: str, *, contact_name: str) -> str:
     # Keep V1 templating intentionally small and predictable.
     return value.replace("{{name}}", contact_name).replace("{{contact_name}}", contact_name)
-
-
 class MockEmailSenderService:
     @staticmethod
     def send_email(
@@ -32,7 +30,7 @@ class MockEmailSenderService:
         body: str,
         template_name: str,
         contact_name: str,
-    ) -> None:
+    ) -> dict[str, str]:
         rendered_subject = _render_template_text(subject, contact_name=contact_name)
         rendered_body = _render_template_text(body, contact_name=contact_name)
         logger.info(
@@ -48,6 +46,10 @@ class MockEmailSenderService:
             contact_name,
             rendered_body,
         )
+        return {
+            "provider": "mock",
+            "message_id": f"mock-{campaign_id}-{contact_id}",
+        }
 
 
 class SesEmailSenderService:
@@ -73,7 +75,7 @@ class SesEmailSenderService:
         body: str,
         template_name: str,
         contact_name: str,
-    ) -> None:
+    ) -> dict[str, str]:
         rendered_subject = _render_template_text(subject, contact_name=contact_name)
         rendered_body = _render_template_text(body, contact_name=contact_name)
         response = self._client.send_email(
@@ -94,6 +96,10 @@ class SesEmailSenderService:
             template_name,
             response.get("MessageId"),
         )
+        return {
+            "provider": "ses",
+            "message_id": str(response.get("MessageId", "")),
+        }
 
 
 class EmailSenderService:
@@ -107,7 +113,7 @@ class EmailSenderService:
         body: str,
         template_name: str,
         contact_name: str,
-    ) -> None:
+    ) -> dict[str, str]:
         provider = settings.email_provider.lower()
         sender_kwargs = {
             "campaign_id": campaign_id,
@@ -120,11 +126,9 @@ class EmailSenderService:
         }
 
         if provider == "mock":
-            MockEmailSenderService.send_email(**sender_kwargs)
-            return
+            return MockEmailSenderService.send_email(**sender_kwargs)
 
         if provider == "ses":
-            SesEmailSenderService().send_email(**sender_kwargs)
-            return
+            return SesEmailSenderService().send_email(**sender_kwargs)
 
         raise RuntimeError(f"Unsupported email provider: {settings.email_provider}")

@@ -30,8 +30,18 @@ class CampaignContact(Base):
         nullable=False,
     )
 
+    processed_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
+    )
+
     sent_at: Mapped[datetime | None] = mapped_column(
         DateTime,
+        nullable=True,
+    )
+
+    provider_message_id: Mapped[str | None] = mapped_column(
+        String(255),
         nullable=True,
     )
 
@@ -45,4 +55,3 @@ class CampaignContact(Base):
         default=datetime.now,
         nullable=False,
     )
-

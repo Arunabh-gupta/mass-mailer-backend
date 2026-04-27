@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -10,7 +11,9 @@ from app.db.models.campaign_contact import CampaignContact
 from app.db.models.contact import Contact
 from app.db.models.email_template import EmailTemplate
 from app.dto.request.campaign_request_dto import CampaignRequestDto
+from app.dto.response.campaign_response_dto import CampaignResponseDto
 from app.dto.response.campaign_send_response_dto import CampaignSendResponseDto
+from app.dto.response.campaign_status_summary import CampaignStatusSummary
 from app.services.campaign_queue_service import CampaignQueueService
 
 logger = logging.getLogger(__name__)
@@ -18,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class CampaignService:
     @staticmethod
-    def get_campaign(db: Session, user_id: UUID, campaign_id: UUID) -> Campaign:
+    def get_campaign_model(db: Session, user_id: UUID, campaign_id: UUID) -> Campaign:
         campaign = (
             db.query(Campaign)
             .filter(
@@ -35,7 +38,48 @@ class CampaignService:
         return campaign
 
     @staticmethod
-    def create_campaign(db: Session, user_id: UUID, payload: CampaignRequestDto) -> Campaign:
+    def build_status_summary(
+        db: Session,
+        campaign_id: UUID,
+    ) -> CampaignStatusSummary:
+        campaign_contacts = (
+            db.query(CampaignContact.status)
+            .filter(CampaignContact.campaign_id == campaign_id)
+            .all()
+        )
+        statuses = [status for (status,) in campaign_contacts]
+        total_recipients = len(statuses)
+        pending_recipients = sum(status == CampaignContactStatus.PENDING.value for status in statuses)
+        sent_recipients = sum(status == CampaignContactStatus.SENT.value for status in statuses)
+        failed_recipients = sum(status == CampaignContactStatus.FAILED.value for status in statuses)
+
+        return CampaignStatusSummary(
+            total_recipients=total_recipients,
+            pending_recipients=pending_recipients,
+            sent_recipients=sent_recipients,
+            failed_recipients=failed_recipients,
+        )
+
+    @staticmethod
+    def build_campaign_response(
+        db: Session,
+        campaign: Campaign,
+    ) -> CampaignResponseDto:
+        return CampaignResponseDto(
+            id=campaign.id,
+            template_id=campaign.template_id,
+            status=CampaignStatus(campaign.status),
+            created_at=campaign.created_at,
+            status_summary=CampaignService.build_status_summary(db, campaign.id),
+        )
+
+    @staticmethod
+    def get_campaign(db: Session, user_id: UUID, campaign_id: UUID) -> CampaignResponseDto:
+        campaign = CampaignService.get_campaign_model(db, user_id, campaign_id)
+        return CampaignService.build_campaign_response(db, campaign)
+
+    @staticmethod
+    def create_campaign(db: Session, user_id: UUID, payload: CampaignRequestDto) -> CampaignResponseDto:
         template = (
             db.query(EmailTemplate)
             .filter(
@@ -100,15 +144,16 @@ class CampaignService:
         db.add_all(campaign_contacts)
         db.commit()
 
-        return campaign
+        return CampaignService.build_campaign_response(db, campaign)
 
     @staticmethod
-    def list_campaigns(db: Session, user_id: UUID) -> list[Campaign]:
-        return (
+    def list_campaigns(db: Session, user_id: UUID) -> list[CampaignResponseDto]:
+        campaigns = (
             db.query(Campaign)
             .filter(Campaign.user_id == user_id)
             .all()
         )
+        return [CampaignService.build_campaign_response(db, campaign) for campaign in campaigns]
 
     @staticmethod
     def list_campaign_contacts(
@@ -129,8 +174,8 @@ class CampaignService:
         user_id: UUID,
         campaign_id: UUID,
         payload: CampaignRequestDto,
-    ) -> Campaign:
-        campaign = CampaignService.get_campaign(db, user_id, campaign_id)
+    ) -> CampaignResponseDto:
+        campaign = CampaignService.get_campaign_model(db, user_id, campaign_id)
 
         if campaign.status != CampaignStatus.DRAFT.value:
             raise HTTPException(
@@ -234,11 +279,11 @@ class CampaignService:
 
         db.commit()
         db.refresh(campaign)
-        return campaign
+        return CampaignService.build_campaign_response(db, campaign)
 
     @staticmethod
     def delete_campaign(db: Session, user_id: UUID, campaign_id: UUID) -> None:
-        campaign = CampaignService.get_campaign(db, user_id, campaign_id)
+        campaign = CampaignService.get_campaign_model(db, user_id, campaign_id)
         if campaign.status == CampaignStatus.SENDING.value:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -259,7 +304,7 @@ class CampaignService:
         user_id: UUID,
         campaign_id: UUID,
     ) -> CampaignSendResponseDto:
-        campaign = CampaignService.get_campaign(db, user_id, campaign_id)
+        campaign = CampaignService.get_campaign_model(db, user_id, campaign_id)
         if campaign.status != CampaignStatus.DRAFT.value:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -297,6 +342,11 @@ class CampaignService:
 
         try:
             for campaign_contact, _contact in campaign_contacts:
+                campaign_contact.processed_at = None
+                campaign_contact.sent_at = None
+                campaign_contact.provider_message_id = None
+                campaign_contact.error_message = None
+                campaign_contact.status = CampaignContactStatus.PENDING.value
                 CampaignQueueService.enqueue_campaign_contact_send(
                     campaign_id=campaign.id,
                     campaign_contact_id=campaign_contact.id,
@@ -314,14 +364,15 @@ class CampaignService:
                 detail="Failed to queue campaign send jobs",
             )
 
-        campaign.status = CampaignStatus.SENDING.value
+        campaign.status = CampaignStatus.COMPLETED.value
         db.commit()
         db.refresh(campaign)
         logger.info(
-            "Queued campaign send | campaign_id=%s recipients=%s user_id=%s",
+            "Queued campaign send | campaign_id=%s recipients=%s user_id=%s status=%s",
             campaign_id,
             len(campaign_contacts),
             user_id,
+            campaign.status,
         )
         return CampaignSendResponseDto(
             campaign_id=campaign.id,
