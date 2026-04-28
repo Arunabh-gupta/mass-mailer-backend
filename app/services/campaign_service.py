@@ -11,6 +11,7 @@ from app.db.models.campaign_contact import CampaignContact
 from app.db.models.contact import Contact
 from app.db.models.email_template import EmailTemplate
 from app.dto.request.campaign_request_dto import CampaignRequestDto
+from app.dto.response.campaign_contact_response_dto import CampaignContactResponseDto
 from app.dto.response.campaign_response_dto import CampaignResponseDto
 from app.dto.response.campaign_send_response_dto import CampaignSendResponseDto
 from app.dto.response.campaign_status_summary import CampaignStatusSummary
@@ -160,13 +161,33 @@ class CampaignService:
         db: Session,
         user_id: UUID,
         campaign_id: UUID,
-    ) -> list[CampaignContact]:
+    ) -> list[CampaignContactResponseDto]:
         CampaignService.get_campaign(db, user_id, campaign_id)
-        return (
-            db.query(CampaignContact)
+        campaign_contacts = (
+            db.query(CampaignContact, Contact)
+            .join(Contact, Contact.id == CampaignContact.contact_id)
             .filter(CampaignContact.campaign_id == campaign_id)
+            .filter(Contact.user_id == user_id)
             .all()
         )
+        return [
+            CampaignContactResponseDto(
+                id=campaign_contact.id,
+                campaign_id=campaign_contact.campaign_id,
+                contact_id=campaign_contact.contact_id,
+                contact_name=contact.name,
+                contact_email=contact.email,
+                contact_company=contact.company,
+                contact_job_title=contact.job_title,
+                status=CampaignContactStatus(campaign_contact.status),
+                processed_at=campaign_contact.processed_at,
+                sent_at=campaign_contact.sent_at,
+                provider_message_id=campaign_contact.provider_message_id,
+                error_message=campaign_contact.error_message,
+                created_at=campaign_contact.created_at,
+            )
+            for campaign_contact, contact in campaign_contacts
+        ]
 
     @staticmethod
     def update_campaign(

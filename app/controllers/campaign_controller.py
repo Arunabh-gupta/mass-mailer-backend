@@ -2,8 +2,8 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.db.models.campaign_contact import CampaignContact
 from app.dto.request.campaign_request_dto import CampaignRequestDto
+from app.dto.response.campaign_contact_response_dto import CampaignContactResponseDto
 from app.dto.response.campaign_response_dto import CampaignResponseDto
 from app.dto.response.campaign_send_response_dto import CampaignSendResponseDto
 from app.services.campaign_service import CampaignService
@@ -31,7 +31,7 @@ class CampaignController:
         db: Session,
         user_id: UUID,
         campaign_id: UUID,
-    ) -> list[CampaignContact]:
+    ) -> list[CampaignContactResponseDto]:
         return CampaignService.list_campaign_contacts(db, user_id, campaign_id)
 
     @staticmethod

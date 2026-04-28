@@ -10,6 +10,10 @@ class CampaignContactResponseDto(BaseModel):
     id: UUID
     campaign_id: UUID
     contact_id: UUID
+    contact_name: str
+    contact_email: str
+    contact_company: str
+    contact_job_title: str | None
     status: CampaignContactStatus
     processed_at: datetime | None
     sent_at: datetime | None
